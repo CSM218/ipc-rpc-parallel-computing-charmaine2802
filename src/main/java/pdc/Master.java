@@ -669,10 +669,12 @@ public class Master {
      */
     public static void main(String[] args) throws IOException {
         Master master = new Master();
-        int port = 8080;
+        final int port;
         
         if (args.length > 0) {
             port = Integer.parseInt(args[0]);
+        } else {
+            port = 8080;
         }
         
         // Start listening in a separate thread
@@ -686,7 +688,7 @@ public class Master {
         
         // Test with a simple matrix
         try {
-            Thread.sleep(2000); // Give workers time to connect
+            Thread.sleep(2000);
             
             int[][] testMatrix = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
             int[][] result = (int[][]) master.coordinate("TEST", testMatrix, 2);
