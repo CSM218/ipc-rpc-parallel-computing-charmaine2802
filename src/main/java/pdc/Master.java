@@ -28,6 +28,7 @@ public class Master {
     private final ExecutorService systemThreads = Executors.newCachedThreadPool();
     private ServerSocket serverSocket;
     private volatile boolean running = false;
+    private String studentId;  // NEW - Add this line
     
     // Worker management
     private final Map<String, WorkerConnection> workers = new ConcurrentHashMap<>();
@@ -38,10 +39,16 @@ public class Master {
     private final AtomicInteger taskIdCounter = new AtomicInteger(0);
     
     // Configuration
-    private static final long WORKER_TIMEOUT_MS = 10000; // 10 seconds
-    private static final long TASK_TIMEOUT_MS = 30000;   // 30 seconds
-    private static final int SOCKET_TIMEOUT_MS = 5000;   // 5 seconds
+    private static final long WORKER_TIMEOUT_MS = 10000; 
+    private static final long TASK_TIMEOUT_MS = 30000;   
+    private static final int SOCKET_TIMEOUT_MS = 5000;   
 
+
+    // Constructor - reads from environment
+    public Master() {
+        this.studentId = System.getenv().getOrDefault("STUDENT_ID", "UNKNOWN");
+        System.out.println("[Master] Initialized with Student ID: " + studentId);
+    }
     /**
      * Inner class to represent a connected worker
      */
@@ -83,7 +90,7 @@ public class Master {
                 if (output != null) output.close();
                 if (socket != null) socket.close();
             } catch (IOException e) {
-                // Ignore
+               
             }
         }
     }
@@ -125,26 +132,26 @@ public class Master {
         System.out.println("[Master] Data size: " + data.length + "x" + (data.length > 0 ? data[0].length : 0));
         System.out.println("[Master] Waiting for " + workerCount + " workers...");
         
-        // Wait for workers to connect
+        
         waitForWorkers(workerCount);
         
-        // Step 1: Split the work into chunks
+     
         List<byte[]> chunks = splitIntoChunks(data, workerCount);
         System.out.println("[Master] Split work into " + chunks.size() + " chunks");
         
-        // Step 2: Create tasks for each chunk
+        
         for (byte[] chunk : chunks) {
             int taskId = taskIdCounter.getAndIncrement();
             tasks.put(taskId, new TaskInfo(taskId, chunk));
         }
         
-        // Step 3: Distribute tasks to workers
+       
         distributeTasks();
         
-        // Step 4: Monitor and collect results
+       
         List<byte[]> results = collectResults();
         
-        // Step 5: Combine results
+        
         System.out.println("[Master] Combining results...");
         int[][] finalResult = combineResults(results, data.length);
         
@@ -193,14 +200,14 @@ public class Master {
         for (int i = 0; i < rows; i += rowsPerChunk) {
             int endRow = Math.min(i + rowsPerChunk, rows);
             
-            // Extract chunk
+           
             int chunkRows = endRow - i;
             int[][] chunk = new int[chunkRows][cols];
             for (int r = 0; r < chunkRows; r++) {
                 System.arraycopy(data[i + r], 0, chunk[r], 0, cols);
             }
             
-            // Serialize chunk
+          
             byte[] serialized = serializeMatrix(chunk);
             chunks.add(serialized);
         }
@@ -223,7 +230,7 @@ public class Master {
                 break;
             }
             
-            // Round-robin assignment
+            
             String workerId = availableWorkers.get(workerIndex % availableWorkers.size());
             assignTaskToWorker(task, workerId);
             
@@ -242,13 +249,14 @@ public class Master {
         }
         
         try {
-            Message taskMessage = new Message();
-            taskMessage.magic = "CSM218";
-            taskMessage.version = 1;
-            taskMessage.type = "TASK";
-            taskMessage.sender = "master";
-            taskMessage.timestamp = System.currentTimeMillis();
-            taskMessage.payload = task.taskData;
+           Message taskMessage = new Message();
+taskMessage.magic = "CSM218";
+taskMessage.version = 1;
+taskMessage.messageType = "RPC_REQUEST";  // Changed from TASK
+taskMessage.studentId = studentId;        // NEW
+taskMessage.sender = "master";
+taskMessage.timestamp = System.currentTimeMillis();
+taskMessage.payload = task.taskData;
             
             worker.sendMessage(taskMessage);
             
@@ -272,7 +280,7 @@ public class Master {
         long startTime = System.currentTimeMillis();
         
         while (!allTasksComplete()) {
-            // Check for timeouts
+           
             long currentTime = System.currentTimeMillis();
             
             for (TaskInfo task : tasks.values()) {
@@ -284,7 +292,7 @@ public class Master {
                         task.assignedWorker = null;
                         task.retryCount++;
                         
-                        // Find another worker
+                      
                         for (String workerId : workers.keySet()) {
                             if (!workerId.equals(task.assignedWorker)) {
                                 assignTaskToWorker(task, workerId);
@@ -295,8 +303,8 @@ public class Master {
                 }
             }
             
-            // Check overall timeout
-            if (currentTime - startTime > 60000) { // 1 minute
+            
+            if (currentTime - startTime > 60000) {
                 System.err.println("[Master] Overall timeout reached!");
                 break;
             }
@@ -309,7 +317,7 @@ public class Master {
             }
         }
         
-        // Extract results in order
+        
         List<byte[]> results = new ArrayList<>();
         for (int i = 0; i < tasks.size(); i++) {
             TaskInfo task = tasks.get(i);
@@ -342,11 +350,11 @@ public class Master {
             return new int[0][0];
         }
         
-        // Deserialize first chunk to get column count
+       
         int[][] firstChunk = deserializeMatrix(results.get(0));
         int cols = firstChunk[0].length;
         
-        // Create result matrix
+      
         int[][] combined = new int[totalRows][cols];
         
         int currentRow = 0;
@@ -364,10 +372,7 @@ public class Master {
         return combined;
     }
 
-    /**
-     * Start the communication listener.
-     * Use your custom protocol designed in Message.java.
-     */
+    
     public void listen(int port) throws IOException {
         serverSocket = new ServerSocket(port);
         running = true;
@@ -383,7 +388,7 @@ public class Master {
                 Socket clientSocket = serverSocket.accept();
                 System.out.println("[Master] New connection from " + clientSocket.getInetAddress());
                 
-                // Handle worker in separate thread
+                
                 systemThreads.submit(() -> handleWorker(clientSocket));
                 
             } catch (IOException e) {
@@ -401,15 +406,16 @@ public class Master {
         WorkerConnection worker = null;
         
         try {
-            // Read initial JOIN message
+            
             DataInputStream tempInput = new DataInputStream(socket.getInputStream());
             int length = tempInput.readInt();
             byte[] data = new byte[length];
             tempInput.readFully(data);
             Message joinMsg = Message.unpack(data);
             
-            if (!joinMsg.type.equals("WORKER_JOIN")) {
-                System.err.println("[Master] Expected WORKER_JOIN, got " + joinMsg.type);
+       if (!joinMsg.messageType.equals("REGISTER_WORKER")) {
+    System.err.println("[Master] Expected REGISTER_WORKER, got " + joinMsg.messageType);
+                System.err.println("[Master] Expected WORKER_JOIN, got " + joinMsg.messageType);
                 socket.close();
                 return;
             }
@@ -422,17 +428,19 @@ public class Master {
             workers.put(workerId, worker);
             workerLastSeen.put(workerId, System.currentTimeMillis());
             
-            // Send ACK
-            Message ack = new Message();
-            ack.magic = "CSM218";
-            ack.version = 1;
-            ack.type = "JOIN_ACK";
-            ack.sender = "master";
-            ack.timestamp = System.currentTimeMillis();
-            ack.payload = new byte[0];
-            worker.sendMessage(ack);
             
-            // Listen for messages from this worker
+            // Send ACK
+// Send ACK
+Message ack = new Message();
+ack.magic = "CSM218";
+ack.version = 1;
+ack.messageType = "WORKER_ACK";  // Changed from JOIN_ACK
+ack.studentId = studentId;        // NEW
+ack.sender = "master";
+ack.timestamp = System.currentTimeMillis();
+ack.payload = new byte[0];
+            
+          
             while (running && worker.active) {
                 try {
                     Message msg = worker.receiveMessage();
@@ -441,7 +449,7 @@ public class Master {
                     handleWorkerMessage(worker, msg);
                     
                 } catch (SocketTimeoutException e) {
-                    // Normal timeout, continue
+                   
                     continue;
                 } catch (IOException e) {
                     System.err.println("[Master] Connection lost with " + workerId);
@@ -465,29 +473,30 @@ public class Master {
      * Handle messages received from workers
      */
     private void handleWorkerMessage(WorkerConnection worker, Message msg) {
-        switch (msg.type) {
-            case "RESULT":
-                handleTaskResult(worker.workerId, msg);
-                break;
-                
-            case "HEARTBEAT_ACK":
-                // Already updated workerLastSeen
-                break;
-                
-            case "ERROR":
-                System.err.println("[Master] Worker " + worker.workerId + " reported error");
-                break;
-                
-            default:
-                System.out.println("[Master] Unknown message type from " + worker.workerId + ": " + msg.type);
-        }
+    switch (msg.messageType) {  // Changed from msg.type
+        case "TASK_COMPLETE":   // Changed from RESULT
+        case "RPC_RESPONSE":    // Also accept RPC_RESPONSE
+            handleTaskResult(worker.workerId, msg);
+            break;
+            
+        case "HEARTBEAT":
+            // Already updated workerLastSeen
+            break;
+            
+        case "TASK_ERROR":
+            System.err.println("[Master] Worker " + worker.workerId + " reported error");
+            break;
+            
+        default:
+            System.out.println("[Master] Unknown message type from " + worker.workerId + ": " + msg.messageType);
     }
+}
 
     /**
      * Handle task result from a worker
      */
     private void handleTaskResult(String workerId, Message msg) {
-        // Find which task this result is for
+       
         for (TaskInfo task : tasks.values()) {
             if (workerId.equals(task.assignedWorker) && !task.completed) {
                 task.result = msg.payload;
@@ -498,10 +507,7 @@ public class Master {
         }
     }
 
-    /**
-     * System Health Check.
-     * Detects dead workers and re-integrates recovered workers.
-     */
+   
     public void reconcileState() {
         long currentTime = System.currentTimeMillis();
         
@@ -517,7 +523,7 @@ public class Master {
             }
         }
         
-        // Remove dead workers and reassign their tasks
+        
         for (String deadWorker : deadWorkers) {
             WorkerConnection worker = workers.remove(deadWorker);
             if (worker != null) {
@@ -526,14 +532,14 @@ public class Master {
             }
             workerLastSeen.remove(deadWorker);
             
-            // Reassign tasks
+       
             for (TaskInfo task : tasks.values()) {
                 if (deadWorker.equals(task.assignedWorker) && !task.completed) {
                     System.out.println("[Master] Reassigning task " + task.taskId + " from dead worker");
                     task.assignedWorker = null;
                     task.retryCount++;
                     
-                    // Find another worker
+                   
                     for (String workerId : workers.keySet()) {
                         assignTaskToWorker(task, workerId);
                         break;
@@ -543,13 +549,11 @@ public class Master {
         }
     }
 
-    /**
-     * Background health check loop
-     */
+    
     private void healthCheckLoop() {
         while (running) {
             try {
-                Thread.sleep(5000); // Check every 5 seconds
+                Thread.sleep(5000); 
                 reconcileState();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
@@ -558,25 +562,23 @@ public class Master {
         }
     }
 
-    /**
-     * Serialize a matrix to bytes
-     */
+    
     private byte[] serializeMatrix(int[][] matrix) {
         if (matrix == null || matrix.length == 0) {
-            return new byte[8]; // Just rows=0, cols=0
+            return new byte[8]; 
         }
         
         int rows = matrix.length;
         int cols = matrix[0].length;
         
-        // 4 bytes for rows + 4 bytes for cols + (rows * cols * 4) bytes for data
+        
         byte[] result = new byte[8 + rows * cols * 4];
         
-        // Write dimensions
+        
         writeInt(result, 0, rows);
         writeInt(result, 4, cols);
         
-        // Write data
+        
         int offset = 8;
         for (int i = 0; i < rows; i++) {
             for (int j = 0; j < cols; j++) {
@@ -616,9 +618,7 @@ public class Master {
         return matrix;
     }
 
-    /**
-     * Helper: Write int to byte array
-     */
+    
     private void writeInt(byte[] array, int offset, int value) {
         array[offset] = (byte) (value >> 24);
         array[offset + 1] = (byte) (value >> 16);
@@ -626,9 +626,7 @@ public class Master {
         array[offset + 3] = (byte) value;
     }
 
-    /**
-     * Helper: Read int from byte array
-     */
+    
     private int readInt(byte[] array, int offset) {
         return ((array[offset] & 0xFF) << 24) |
                ((array[offset + 1] & 0xFF) << 16) |
@@ -647,7 +645,7 @@ public class Master {
                 serverSocket.close();
             }
         } catch (IOException e) {
-            // Ignore
+           
         }
         
         for (WorkerConnection worker : workers.values()) {
@@ -667,42 +665,52 @@ public class Master {
     /**
      * Main method for testing
      */
-    public static void main(String[] args) throws IOException {
-        Master master = new Master();
-        final int port;
-        
-        if (args.length > 0) {
-            port = Integer.parseInt(args[0]);
-        } else {
-            port = 8080;
-        }
-        
-        // Start listening in a separate thread
-        new Thread(() -> {
-            try {
-                master.listen(port);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
-        }).start();
-        
-        // Test with a simple matrix
+   
+public static void main(String[] args) throws IOException {
+    Master master = new Master();
+    
+    // Read port from environment or use default
+    int port = Integer.parseInt(
+        System.getenv().getOrDefault("MASTER_PORT", "8080")
+    );
+    
+    // Command line args override environment
+    if (args.length > 0) {
+        port = Integer.parseInt(args[0]);
+    }
+    
+    System.out.println("[Master] Starting on port: " + port);
+    System.out.println("[Master] Student ID: " + master.studentId);
+    
+    // Start listening in a separate thread
+    final int finalPort = port;
+    new Thread(() -> {
         try {
-            Thread.sleep(2000);
-            
-            int[][] testMatrix = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
-            int[][] result = (int[][]) master.coordinate("TEST", testMatrix, 2);
-            
-            System.out.println("[Master] Result:");
+            master.listen(finalPort);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }).start();
+    
+    // Test with a simple matrix
+    try {
+        Thread.sleep(2000); // Give workers time to connect
+        
+        int[][] testMatrix = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
+        int[][] result = (int[][]) master.coordinate("TEST", testMatrix, 2);
+        
+        System.out.println("[Master] Result:");
+        if (result != null) {
             for (int[] row : result) {
                 for (int val : row) {
                     System.out.print(val + " ");
                 }
                 System.out.println();
             }
-            
-        } catch (InterruptedException e) {
-            e.printStackTrace();
         }
+        
+    } catch (InterruptedException e) {
+        e.printStackTrace();
     }
+}
 }

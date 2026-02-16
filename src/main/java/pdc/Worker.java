@@ -16,17 +16,21 @@ public class Worker {
     private DataInputStream input;
     private DataOutputStream output;
     private String workerId;
+    private String studentId;       // NEW
     private boolean running;
 
-    // Default constructor
+    // Default constructor (for tests)
     public Worker() {
-        this.workerId = "worker-" + System.currentTimeMillis();
+        this.workerId = System.getenv().getOrDefault("WORKER_ID", 
+            "worker-" + System.currentTimeMillis());
+        this.studentId = System.getenv().getOrDefault("STUDENT_ID", "UNKNOWN");
         this.running = false;
     }
 
     // Constructor with ID
     public Worker(String workerId) {
         this.workerId = workerId;
+        this.studentId = System.getenv().getOrDefault("STUDENT_ID", "UNKNOWN");
         this.running = false;
     }
 
@@ -45,20 +49,19 @@ public class Worker {
             output = new DataOutputStream(socket.getOutputStream());
             
             // registration message sent  to Master
-            Message joinMessage = new Message();
-            joinMessage.magic = "CSM218";
-            joinMessage.version = 1;
-            joinMessage.type = "WORKER_JOIN";
-            joinMessage.sender = workerId;
-            joinMessage.timestamp = System.currentTimeMillis();
-            joinMessage.payload = new byte[0]; // Empty payload for join
-            
-            sendMessage(joinMessage);
-            System.out.println("[Worker " + workerId + "] Sent JOIN request to Master");
+            // Step 3: Send a registration message to Master
+Message joinMessage = new Message();
+joinMessage.magic = "CSM218";
+joinMessage.version = 1;
+joinMessage.messageType = "REGISTER_WORKER";  // Changed from WORKER_JOIN
+joinMessage.studentId = studentId;            // NEW
+joinMessage.sender = workerId;
+joinMessage.timestamp = System.currentTimeMillis();
+joinMessage.payload = new byte[0];
             
             // Wait for acknowledgment from Master
             Message ackMessage = receiveMessage();
-            if (ackMessage != null && ackMessage.type.equals("JOIN_ACK")) {
+            if (ackMessage != null && ackMessage.messageType.equals("JOIN_ACK")) {
                 System.out.println("[Worker " + workerId + "] Successfully joined cluster!");
                 running = true;
                 
@@ -93,26 +96,26 @@ public class Worker {
                     break;
                 }
                 
-                System.out.println("[Worker " + workerId + "] Received task: " + taskMessage.type);
+                System.out.println("[Worker " + workerId + "] Received task: " + taskMessage.messageType);
                 
                 // Handle different message types
-                switch (taskMessage.type) {
-                    case "TASK":
-                        handleTask(taskMessage);
-                        break;
-                        
-                    case "HEARTBEAT":
-                        handleHeartbeat(taskMessage);
-                        break;
-                        
-                    case "SHUTDOWN":
-                        System.out.println("[Worker " + workerId + "] Received shutdown command");
-                        running = false;
-                        break;
-                        
-                    default:
-                        System.out.println("[Worker " + workerId + "] Unknown message type: " + taskMessage.type);
-                }
+                switch (taskMessage.messageType) {  // Changed from .type
+    case "RPC_REQUEST":             // Changed from TASK
+        handleTask(taskMessage);
+        break;
+        
+    case "HEARTBEAT":
+        handleHeartbeat(taskMessage);
+        break;
+        
+    case "SHUTDOWN":
+        System.out.println("[Worker " + workerId + "] Received shutdown command");
+        running = false;
+        break;
+        
+    default:
+        System.out.println("[Worker " + workerId + "] Unknown message type: " + taskMessage.messageType);
+}
                 
             } catch (Exception e) {
                 System.err.println("[Worker " + workerId + "] Error during execution: " + e.getMessage());
@@ -143,12 +146,13 @@ public class Worker {
             
             
             Message resultMessage = new Message();
-            resultMessage.magic = "CSM218";
-            resultMessage.version = 1;
-            resultMessage.type = "RESULT";
-            resultMessage.sender = workerId;
-            resultMessage.timestamp = System.currentTimeMillis();
-            resultMessage.payload = resultData;
+resultMessage.magic = "CSM218";
+resultMessage.version = 1;
+resultMessage.messageType = "TASK_COMPLETE";  // Changed from RESULT
+resultMessage.studentId = studentId;          // NEW
+resultMessage.sender = workerId;
+resultMessage.timestamp = System.currentTimeMillis();
+resultMessage.payload = resultData;
             
             sendMessage(resultMessage);
             System.out.println("[Worker " + workerId + "] Sent result back to Master");
@@ -162,35 +166,19 @@ public class Worker {
     }
 
     /**
-     * Performs the actual computation (matrix multiplication or other operations)
-     */
-    private byte[] performComputation(byte[] taskData) {
-        // TODO: Implement actual matrix multiplication logic here
-        // For now, just echo back the data (placeholder)
-        
-       
-        try {
-            Thread.sleep(100); // Simulating computation time
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-        }
-        
-        return taskData; // Placeholder - replace with actual computation
-    }
-
-    /**
      * Responds to heartbeat checks from Master
      */
     private void handleHeartbeat(Message heartbeatMessage) {
         try {
-            // Send heartbeat response
+            
             Message response = new Message();
-            response.magic = "CSM218";
-            response.version = 1;
-            response.type = "HEARTBEAT_ACK";
-            response.sender = workerId;
-            response.timestamp = System.currentTimeMillis();
-            response.payload = new byte[0];
+response.magic = "CSM218";
+response.version = 1;
+response.messageType = "HEARTBEAT";
+response.studentId = studentId;    // NEW
+response.sender = workerId;
+response.timestamp = System.currentTimeMillis();
+response.payload = new byte[0];
             
             sendMessage(response);
             System.out.println("[Worker " + workerId + "] Responded to heartbeat");
@@ -206,12 +194,13 @@ public class Worker {
     private void sendErrorMessage(Message originalTask) {
         try {
             Message errorMessage = new Message();
-            errorMessage.magic = "CSM218";
-            errorMessage.version = 1;
-            errorMessage.type = "ERROR";
-            errorMessage.sender = workerId;
-            errorMessage.timestamp = System.currentTimeMillis();
-            errorMessage.payload = "Task failed".getBytes();
+errorMessage.magic = "CSM218";
+errorMessage.version = 1;
+errorMessage.messageType = "TASK_ERROR";  // Already correct
+errorMessage.studentId = studentId;       // NEW
+errorMessage.sender = workerId;
+errorMessage.timestamp = System.currentTimeMillis();
+errorMessage.payload = "Task failed".getBytes();
             
             sendMessage(errorMessage);
             
@@ -225,8 +214,8 @@ public class Worker {
      */
     private void sendMessage(Message msg) throws IOException {
         byte[] packed = msg.pack();
-        output.writeInt(packed.length); // Send length first
-        output.write(packed);           // Then send the actual message
+        output.writeInt(packed.length); 
+        output.write(packed);           
         output.flush();
     }
 
@@ -235,12 +224,12 @@ public class Worker {
      */
     private Message receiveMessage() throws IOException {
         try {
-            int length = input.readInt();           // Read length first
+            int length = input.readInt();           
             byte[] data = new byte[length];
-            input.readFully(data);                  // Read exact number of bytes
+            input.readFully(data);                  
             return Message.unpack(data);
         } catch (IOException e) {
-            return null; // Connection closed
+            return null; 
         }
     }
 
@@ -259,21 +248,142 @@ public class Worker {
     }
 
     /**
-     * Main method for testing (you can run a worker standalone)
+     * Main method for testing 
      */
-    public static void main(String[] args) {
-        String workerId = "worker-1";
-        String masterHost = "localhost";
-        int port = 8080;
-        
-        // Parse command line arguments if provided
-        if (args.length >= 3) {
-            workerId = args[0];
-            masterHost = args[1];
-            port = Integer.parseInt(args[2]);
-        }
-        
-        Worker worker = new Worker(workerId);
-        worker.joinCluster(masterHost, port);
+   public static void main(String[] args) {
+    
+    String workerId = System.getenv().getOrDefault("WORKER_ID", "worker-1");
+    String masterHost = System.getenv().getOrDefault("MASTER_HOST", "localhost");
+    int port = Integer.parseInt(System.getenv().getOrDefault("MASTER_PORT", "8080"));
+    
+    
+    if (args.length >= 3) {
+        workerId = args[0];
+        masterHost = args[1];
+        port = Integer.parseInt(args[2]);
     }
+    
+    System.out.println("[Worker] Starting with ID: " + workerId);
+    System.out.println("[Worker] Connecting to: " + masterHost + ":" + port);
+    
+    Worker worker = new Worker(workerId);
+    worker.joinCluster(masterHost, port);
+}
+/**
+ * Performs the actual computation (matrix multiplication or other operations)
+ */
+private byte[] performComputation(byte[] taskData) {
+    try {
+        // Deserialize the matrix from bytes
+        int[][] matrix = deserializeMatrix(taskData);
+        
+        // Perform computation on the matrix
+        int[][] result = processMatrixChunk(matrix);
+        
+        // Serialize the result back to bytes
+        return serializeMatrix(result);
+        
+    } catch (Exception e) {
+        System.err.println("[Worker " + workerId + "] Error during computation: " + e.getMessage());
+        e.printStackTrace();
+        return taskData;
+    }
+}
+
+/**
+ * Process a matrix chunk (multiply each element by 2 as placeholder)
+ */
+private int[][] processMatrixChunk(int[][] matrix) {
+    if (matrix == null || matrix.length == 0) {
+        return matrix;
+    }
+    
+    int rows = matrix.length;
+    int cols = matrix[0].length;
+    int[][] result = new int[rows][cols];
+    
+    // Placeholder: multiply each element by 2
+    // In actual matrix multiplication, this would be row x column operations
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            result[i][j] = matrix[i][j] * 2;
+        }
+    }
+    
+    return result;
+}
+
+/**
+ * Serialize a matrix to bytes
+ */
+private byte[] serializeMatrix(int[][] matrix) {
+    if (matrix == null || matrix.length == 0) {
+        return new byte[8];
+    }
+    
+    int rows = matrix.length;
+    int cols = matrix[0].length;
+    byte[] result = new byte[8 + rows * cols * 4];
+    
+    writeInt(result, 0, rows);
+    writeInt(result, 4, cols);
+    
+    int offset = 8;
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            writeInt(result, offset, matrix[i][j]);
+            offset += 4;
+        }
+    }
+    
+    return result;
+}
+
+/**
+ * Deserialize bytes back to a matrix
+ */
+private int[][] deserializeMatrix(byte[] data) {
+    if (data == null || data.length < 8) {
+        return new int[0][0];
+    }
+    
+    int rows = readInt(data, 0);
+    int cols = readInt(data, 4);
+    
+    if (rows == 0 || cols == 0) {
+        return new int[0][0];
+    }
+    
+    int[][] matrix = new int[rows][cols];
+    int offset = 8;
+    
+    for (int i = 0; i < rows; i++) {
+        for (int j = 0; j < cols; j++) {
+            matrix[i][j] = readInt(data, offset);
+            offset += 4;
+        }
+    }
+    
+    return matrix;
+}
+
+/**
+ * Helper: Write int to byte array
+ */
+private void writeInt(byte[] array, int offset, int value) {
+    array[offset] = (byte) (value >> 24);
+    array[offset + 1] = (byte) (value >> 16);
+    array[offset + 2] = (byte) (value >> 8);
+    array[offset + 3] = (byte) value;
+}
+
+/**
+ * Helper: Read int from byte array
+ */
+private int readInt(byte[] array, int offset) {
+    return ((array[offset] & 0xFF) << 24) |
+           ((array[offset + 1] & 0xFF) << 16) |
+           ((array[offset + 2] & 0xFF) << 8) |
+           (array[offset + 3] & 0xFF);
+}
 }
