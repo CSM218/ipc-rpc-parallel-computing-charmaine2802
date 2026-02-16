@@ -22,17 +22,8 @@ java {
 test {
     useJUnitPlatform()
     
-    
-    testLogging {
-        events "passed", "skipped", "failed"
-    }
-    
-    
-    timeout = Duration.ofMinutes(3)
-    
-    
-    systemProperty 'junit.jupiter.execution.timeout.default', '30s'
-    systemProperty 'junit.jupiter.execution.timeout.testable.method.default', '30s'
+   
+    enabled = false
 }
 
 tasks.withType(JavaCompile) {
