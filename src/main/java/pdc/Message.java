@@ -34,34 +34,31 @@ public class Message {
             // Create a stream to write bytes to
             ByteArrayOutputStream baos = new ByteArrayOutputStream();
             DataOutputStream dos = new DataOutputStream(baos);
+        
 
-            // Write each field in a specific order
-            // The receiver will read in the SAME order
-
-            // 1. Write magic string (protocol identifier)
+            //  Write magic string 
             dos.writeUTF(magic != null ? magic : "");
 
-            // 2. Write version number
+            //  Write version number
             dos.writeInt(version);
 
-            // 3. Write message type
+            //  Write message type
             dos.writeUTF(type != null ? type : "");
 
-            // 4. Write sender ID
+            //  Write sender ID
             dos.writeUTF(sender != null ? sender : "");
 
-            // 5. Write timestamp
+            //  Write timestamp
             dos.writeLong(timestamp);
 
-            // 6. Write payload length (CRITICAL: so receiver knows how much to read)
+            //  Write payload length 
             if (payload != null) {
                 dos.writeInt(payload.length);
-                dos.write(payload); // 7. Write actual payload data
+                dos.write(payload); //  Write actual payload data
             } else {
                 dos.writeInt(0); // No payload
             }
 
-            // Close streams and return the byte array
             dos.flush();
             byte[] result = baos.toByteArray();
             dos.close();
@@ -70,7 +67,7 @@ public class Message {
             return result;
 
         } catch (IOException e) {
-            // If something goes wrong, wrap it in a runtime exception
+            
             throw new RuntimeException("Failed to pack message", e);
         }
     }
@@ -87,27 +84,27 @@ public class Message {
             // Create a new message to fill
             Message msg = new Message();
 
-            // Read each field in the SAME order we wrote them in pack()
+           
 
-            // 1. Read magic string
+            //  Read magic string
             msg.magic = dis.readUTF();
 
-            // 2. Read version number
+            //  Read version number
             msg.version = dis.readInt();
 
-            // 3. Read message type
+            //  Read message type
             msg.type = dis.readUTF();
 
-            // 4. Read sender ID
+            //  Read sender ID
             msg.sender = dis.readUTF();
 
-            // 5. Read timestamp
+            //  Read timestamp
             msg.timestamp = dis.readLong();
 
-            // 6. Read payload length
+            //  Read payload length
             int payloadLength = dis.readInt();
 
-            // 7. Read payload data (only if there is any)
+            //  Read payload data (only if there is any)
             if (payloadLength > 0) {
                 msg.payload = new byte[payloadLength];
                 dis.readFully(msg.payload); // Read exactly payloadLength bytes
@@ -122,7 +119,7 @@ public class Message {
             return msg;
 
         } catch (IOException e) {
-            // If something goes wrong, wrap it in a runtime exception
+          
             throw new RuntimeException("Failed to unpack message", e);
         }
     }

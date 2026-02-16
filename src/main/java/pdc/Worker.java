@@ -18,7 +18,7 @@ public class Worker {
     private String workerId;
     private boolean running;
 
-    // Default constructor (for tests)
+    // Default constructor
     public Worker() {
         this.workerId = "worker-" + System.currentTimeMillis();
         this.running = false;
@@ -36,15 +36,15 @@ public class Worker {
      */
     public void joinCluster(String masterHost, int port) {
         try {
-            // Step 1: Connect to the Master
+            // connection to the master
             System.out.println("[Worker " + workerId + "] Connecting to Master at " + masterHost + ":" + port);
             socket = new Socket(masterHost, port);
             
-            // Step 2: Set up input/output streams
+            // Set up for input/output streams
             input = new DataInputStream(socket.getInputStream());
             output = new DataOutputStream(socket.getOutputStream());
             
-            // Step 3: Send a registration message to Master
+            // registration message sent  to Master
             Message joinMessage = new Message();
             joinMessage.magic = "CSM218";
             joinMessage.version = 1;
@@ -56,13 +56,13 @@ public class Worker {
             sendMessage(joinMessage);
             System.out.println("[Worker " + workerId + "] Sent JOIN request to Master");
             
-            // Step 4: Wait for acknowledgment from Master
+            // Wait for acknowledgment from Master
             Message ackMessage = receiveMessage();
             if (ackMessage != null && ackMessage.type.equals("JOIN_ACK")) {
                 System.out.println("[Worker " + workerId + "] Successfully joined cluster!");
                 running = true;
                 
-                // Step 5: Start working - listen for tasks
+                // Start working and listen for tasks
                 execute();
             }
             
@@ -85,7 +85,7 @@ public class Worker {
         
         while (running) {
             try {
-                // Step 1: Wait for a task from Master
+                // Wait for a task from Master
                 Message taskMessage = receiveMessage();
                 
                 if (taskMessage == null) {
@@ -95,7 +95,7 @@ public class Worker {
                 
                 System.out.println("[Worker " + workerId + "] Received task: " + taskMessage.type);
                 
-                // Step 2: Handle different message types
+                // Handle different message types
                 switch (taskMessage.type) {
                     case "TASK":
                         handleTask(taskMessage);
@@ -121,7 +121,7 @@ public class Worker {
             }
         }
         
-        // Cleanup
+        
         cleanup();
     }
 
@@ -132,18 +132,16 @@ public class Worker {
         try {
             long startTime = System.currentTimeMillis();
             
-            // Step 1: Extract the task data from payload
-            // The payload contains the matrix data to process
-            byte[] taskData = taskMessage.payload;
+        
             
-            // Step 2: Perform the computation (matrix multiplication)
-            // For now, we'll simulate work - you'll implement actual matrix math later
+            byte[] taskData = taskMessage.payload;
+           
             byte[] resultData = performComputation(taskData);
             
             long endTime = System.currentTimeMillis();
             System.out.println("[Worker " + workerId + "] Task completed in " + (endTime - startTime) + "ms");
             
-            // Step 3: Send result back to Master
+            
             Message resultMessage = new Message();
             resultMessage.magic = "CSM218";
             resultMessage.version = 1;
@@ -158,7 +156,7 @@ public class Worker {
         } catch (Exception e) {
             System.err.println("[Worker " + workerId + "] Failed to handle task: " + e.getMessage());
             
-            // Send error message back to Master
+            
             sendErrorMessage(taskMessage);
         }
     }
@@ -170,9 +168,9 @@ public class Worker {
         // TODO: Implement actual matrix multiplication logic here
         // For now, just echo back the data (placeholder)
         
-        // Simulate some work
+       
         try {
-            Thread.sleep(100); // Simulate computation time
+            Thread.sleep(100); // Simulating computation time
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
