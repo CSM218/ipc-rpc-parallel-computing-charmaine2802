@@ -28,7 +28,7 @@ public class Master {
     private final ExecutorService systemThreads = Executors.newCachedThreadPool();
     private ServerSocket serverSocket;
     private volatile boolean running = false;
-    private String studentId;  // NEW - Add this line
+    private String studentId; 
     
     // Worker management
     private final Map<String, WorkerConnection> workers = new ConcurrentHashMap<>();
@@ -44,7 +44,7 @@ public class Master {
     private static final int SOCKET_TIMEOUT_MS = 5000;   
 
 
-    // Constructor - reads from environment
+    // Constructor reads from environment
     public Master() {
         this.studentId = System.getenv().getOrDefault("STUDENT_ID", "UNKNOWN");
         System.out.println("[Master] Initialized with Student ID: " + studentId);
@@ -164,7 +164,7 @@ public class Master {
      */
     private void waitForWorkers(int count) {
         long startTime = System.currentTimeMillis();
-        long timeout = 30000; // 30 seconds
+        long timeout = 30000;
         
         while (workers.size() < count) {
             if (System.currentTimeMillis() - startTime > timeout) {
@@ -252,8 +252,8 @@ public class Master {
            Message taskMessage = new Message();
 taskMessage.magic = "CSM218";
 taskMessage.version = 1;
-taskMessage.messageType = "RPC_REQUEST";  // Changed from TASK
-taskMessage.studentId = studentId;        // NEW
+taskMessage.messageType = "RPC_REQUEST";  
+taskMessage.studentId = studentId;        
 taskMessage.sender = "master";
 taskMessage.timestamp = System.currentTimeMillis();
 taskMessage.payload = task.taskData;
@@ -379,10 +379,10 @@ taskMessage.payload = task.taskData;
         
         System.out.println("[Master] Listening on port " + port);
         
-        // Start health check thread
+       
         systemThreads.submit(this::healthCheckLoop);
         
-        // Accept worker connections
+      
         while (running) {
             try {
                 Socket clientSocket = serverSocket.accept();
@@ -423,19 +423,19 @@ taskMessage.payload = task.taskData;
             String workerId = joinMsg.sender;
             System.out.println("[Master] Worker " + workerId + " joined");
             
-            // Create worker connection
+           
             worker = new WorkerConnection(workerId, socket);
             workers.put(workerId, worker);
             workerLastSeen.put(workerId, System.currentTimeMillis());
             
             
-            // Send ACK
-// Send ACK
+            
+
 Message ack = new Message();
 ack.magic = "CSM218";
 ack.version = 1;
-ack.messageType = "WORKER_ACK";  // Changed from JOIN_ACK
-ack.studentId = studentId;        // NEW
+ack.messageType = "WORKER_ACK";  
+ack.studentId = studentId;       
 ack.sender = "master";
 ack.timestamp = System.currentTimeMillis();
 ack.payload = new byte[0];
@@ -473,14 +473,14 @@ ack.payload = new byte[0];
      * Handle messages received from workers
      */
     private void handleWorkerMessage(WorkerConnection worker, Message msg) {
-    switch (msg.messageType) {  // Changed from msg.type
-        case "TASK_COMPLETE":   // Changed from RESULT
-        case "RPC_RESPONSE":    // Also accept RPC_RESPONSE
+    switch (msg.messageType) {  
+        case "TASK_COMPLETE":   
+        case "RPC_RESPONSE":    
             handleTaskResult(worker.workerId, msg);
             break;
             
         case "HEARTBEAT":
-            // Already updated workerLastSeen
+            
             break;
             
         case "TASK_ERROR":
@@ -669,12 +669,12 @@ ack.payload = new byte[0];
 public static void main(String[] args) throws IOException {
     Master master = new Master();
     
-    // Read port from environment or use default
+   
     int port = Integer.parseInt(
         System.getenv().getOrDefault("MASTER_PORT", "8080")
     );
     
-    // Command line args override environment
+   
     if (args.length > 0) {
         port = Integer.parseInt(args[0]);
     }
@@ -682,7 +682,7 @@ public static void main(String[] args) throws IOException {
     System.out.println("[Master] Starting on port: " + port);
     System.out.println("[Master] Student ID: " + master.studentId);
     
-    // Start listening in a separate thread
+   
     final int finalPort = port;
     new Thread(() -> {
         try {
@@ -692,9 +692,9 @@ public static void main(String[] args) throws IOException {
         }
     }).start();
     
-    // Test with a simple matrix
+   
     try {
-        Thread.sleep(2000); // Give workers time to connect
+        Thread.sleep(2000); 
         
         int[][] testMatrix = {{1, 2, 3}, {4, 5, 6}, {7, 8, 9}};
         int[][] result = (int[][]) master.coordinate("TEST", testMatrix, 2);

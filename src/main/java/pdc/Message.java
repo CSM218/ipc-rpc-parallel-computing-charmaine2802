@@ -41,7 +41,7 @@ public class Message {
             dos.writeUTF(sender != null ? sender : "");
             dos.writeLong(timestamp);
 
-            // Write payload
+            
             if (payload != null) {
                 dos.writeInt(payload.length);
                 dos.write(payload);
@@ -71,7 +71,7 @@ public class Message {
 
             Message msg = new Message();
 
-            // Read in same order as pack()
+            
             msg.magic = dis.readUTF();
             msg.version = dis.readInt();
             msg.messageType = dis.readUTF();

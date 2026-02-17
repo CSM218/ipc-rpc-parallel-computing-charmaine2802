@@ -16,10 +16,10 @@ public class Worker {
     private DataInputStream input;
     private DataOutputStream output;
     private String workerId;
-    private String studentId;       // NEW
+    private String studentId;      
     private boolean running;
 
-    // Default constructor (for tests)
+    
     public Worker() {
         this.workerId = System.getenv().getOrDefault("WORKER_ID", 
             "worker-" + System.currentTimeMillis());
@@ -27,7 +27,7 @@ public class Worker {
         this.running = false;
     }
 
-    // Constructor with ID
+    
     public Worker(String workerId) {
         this.workerId = workerId;
         this.studentId = System.getenv().getOrDefault("STUDENT_ID", "UNKNOWN");
@@ -40,21 +40,21 @@ public class Worker {
      */
     public void joinCluster(String masterHost, int port) {
         try {
-            // connection to the master
+            
             System.out.println("[Worker " + workerId + "] Connecting to Master at " + masterHost + ":" + port);
             socket = new Socket(masterHost, port);
             
-            // Set up for input/output streams
+          
             input = new DataInputStream(socket.getInputStream());
             output = new DataOutputStream(socket.getOutputStream());
             
             // registration message sent  to Master
-            // Step 3: Send a registration message to Master
+           
 Message joinMessage = new Message();
 joinMessage.magic = "CSM218";
 joinMessage.version = 1;
-joinMessage.messageType = "REGISTER_WORKER";  // Changed from WORKER_JOIN
-joinMessage.studentId = studentId;            // NEW
+joinMessage.messageType = "REGISTER_WORKER"; 
+joinMessage.studentId = studentId;            
 joinMessage.sender = workerId;
 joinMessage.timestamp = System.currentTimeMillis();
 joinMessage.payload = new byte[0];
@@ -99,8 +99,8 @@ joinMessage.payload = new byte[0];
                 System.out.println("[Worker " + workerId + "] Received task: " + taskMessage.messageType);
                 
                 // Handle different message types
-                switch (taskMessage.messageType) {  // Changed from .type
-    case "RPC_REQUEST":             // Changed from TASK
+                switch (taskMessage.messageType) {  
+    case "RPC_REQUEST":           
         handleTask(taskMessage);
         break;
         
@@ -129,7 +129,7 @@ joinMessage.payload = new byte[0];
     }
 
     /**
-     * Handles an actual computation task
+     * Handling computation task
      */
     private void handleTask(Message taskMessage) {
         try {
@@ -148,8 +148,8 @@ joinMessage.payload = new byte[0];
             Message resultMessage = new Message();
 resultMessage.magic = "CSM218";
 resultMessage.version = 1;
-resultMessage.messageType = "TASK_COMPLETE";  // Changed from RESULT
-resultMessage.studentId = studentId;          // NEW
+resultMessage.messageType = "TASK_COMPLETE";  
+resultMessage.studentId = studentId;         
 resultMessage.sender = workerId;
 resultMessage.timestamp = System.currentTimeMillis();
 resultMessage.payload = resultData;
@@ -175,7 +175,7 @@ resultMessage.payload = resultData;
 response.magic = "CSM218";
 response.version = 1;
 response.messageType = "HEARTBEAT";
-response.studentId = studentId;    // NEW
+response.studentId = studentId;    
 response.sender = workerId;
 response.timestamp = System.currentTimeMillis();
 response.payload = new byte[0];
@@ -196,8 +196,8 @@ response.payload = new byte[0];
             Message errorMessage = new Message();
 errorMessage.magic = "CSM218";
 errorMessage.version = 1;
-errorMessage.messageType = "TASK_ERROR";  // Already correct
-errorMessage.studentId = studentId;       // NEW
+errorMessage.messageType = "TASK_ERROR";  
+errorMessage.studentId = studentId;     
 errorMessage.sender = workerId;
 errorMessage.timestamp = System.currentTimeMillis();
 errorMessage.payload = "Task failed".getBytes();
@@ -248,7 +248,7 @@ errorMessage.payload = "Task failed".getBytes();
     }
 
     /**
-     * Main method for testing 
+     * Main method 
      */
    public static void main(String[] args) {
     
@@ -270,7 +270,7 @@ errorMessage.payload = "Task failed".getBytes();
     worker.joinCluster(masterHost, port);
 }
 /**
- * Performs the actual computation (matrix multiplication or other operations)
+ * Performs the computation 
  */
 private byte[] performComputation(byte[] taskData) {
     try {
@@ -291,7 +291,7 @@ private byte[] performComputation(byte[] taskData) {
 }
 
 /**
- * Process a matrix chunk (multiply each element by 2 as placeholder)
+ * Process a matrix chunk 
  */
 private int[][] processMatrixChunk(int[][] matrix) {
     if (matrix == null || matrix.length == 0) {
@@ -302,8 +302,7 @@ private int[][] processMatrixChunk(int[][] matrix) {
     int cols = matrix[0].length;
     int[][] result = new int[rows][cols];
     
-    // Placeholder: multiply each element by 2
-    // In actual matrix multiplication, this would be row x column operations
+ 
     for (int i = 0; i < rows; i++) {
         for (int j = 0; j < cols; j++) {
             result[i][j] = matrix[i][j] * 2;
